@@ -1,0 +1,15 @@
+{
+  "name": "speedyservice",
+  "version": "1.0.0",
+  "description": "Service Script to get the most important stuff from a customer install",
+  "main": "app.js",
+  "scripts": {
+    "test": "standard --fix && node my-tests.js"
+  },
+  "author": "JR",
+  "license": "ISC",
+  "dependencies": {
+    "check-disk-space": "^3.4.0",
+    "mssql": "^10.0.1"
+  }
+}
