@@ -11,9 +11,10 @@ const readline = require('node:readline').createInterface({
 });;
 
 let pool;
+let requiredUpdates = [];
 
 // Asking the user for the Credentials of a elevated user
-process.stdout.write("Please enter the username of a user with read privileges to the SQL Server(e.g. sa, PWCE):")
+process.stdout.write("Please enter the username of a user with read privileges to the SQL Server(e.g. sa):")
 
 readline.question('Please enter a username with read rights to the SQL-Server:', username => {
   let elevatedUsername = username;
@@ -34,7 +35,8 @@ readline.question('Please enter a username with read rights to the SQL-Server:',
       },
       options: {
         encrypt: false, // for azure
-        trustServerCertificate: true // change to true for local dev /
+        trustServerCertificate: true, // change to true for local dev /
+        trustedConnection: true
       }
     }
     sqlConfig['user'] = elevatedUsername;
@@ -47,6 +49,7 @@ readline.question('Please enter a username with read rights to the SQL-Server:',
     databaseSize();
     checkUpdates();
     sqlversion();
+    checkSWVersion();
     
     checkPanelFirmware();
     checkSubPanelFirmware();
@@ -75,7 +78,14 @@ function checkUpdates() {
   ])
   
   updates.stdout.on('data', (data) => {
-    logger.write('##Benötigte Updates: \r\n' + data + '\r\n');
+    requiredUpdates.push(data);
+  })
+
+  updates.on('close', (code) => {
+    logger.write('##Required Updates: \r\n');
+    requiredUpdates.splice(2).forEach(line => {
+      logger.write(line);
+    })
   })
 }
 
@@ -118,7 +128,7 @@ pool.connect( err => {
     console.log(err);
   }
   dbSizemssql.execute('sp_spaceused', (err, result) => {
-    logger.write('##Database size of PWNT(max 9,31 GiB): ' + result.recordset[0]?.database_size + '\r\n')
+    logger.write('##Database size of PWNT(max 9,31 GiB): ' + result.recordset[0]?.database_size + '\r\n\r\n')
     if(err) {
       console.log(err);
     }
@@ -127,7 +137,7 @@ pool.connect( err => {
 })
 }
 
-// check firmware-versions from Panel
+// check firmware-versions of Panel
 function checkPanelFirmware() {
   const panelFirmware = new sql.Request(pool)
 pool.connect( err => {
@@ -136,10 +146,10 @@ pool.connect( err => {
   }
   panelFirmware.query('SELECT DESCRP, LOCATION, FIRMWARE_VERSION, INSTALLED FROM Panel', (err, result) => {
     logger.write('##Panel Firmware Versions: \r\n');
-    logger.write('Description:'.padEnd(64) + 'Location:'.padEnd(64) + 'Installed:'.padEnd(10) + 'Firmware Version:' + '\r\n')
+    logger.write('Description:'.padEnd(64) + 'Location:'.padEnd(64) + 'Installed:'.padEnd(12) + 'Firmware Version:' + '\r\n')
     let all = [...result.recordset];
     all.forEach(line => {
-        logger.write(line?.DESCRP.padEnd(64) + line?.LOCATION.padEnd(64) + line?.INSTALLED.padEnd(10)  + line?.FIRMWARE_VERSION + '\r\n');
+        logger.write(line?.DESCRP.padEnd(64) + line?.LOCATION.padEnd(64) + line?.INSTALLED.padEnd(12)  + line?.FIRMWARE_VERSION + '\r\n');
     })
     logger.write('\r\n\r\n');
     if(err) {
@@ -149,7 +159,7 @@ pool.connect( err => {
   })
 })
 }
-// check firmware-versions from SubPanels
+// check firmware-versions of SubPanels
 function checkSubPanelFirmware() {
   const subpanelFirmware = new sql.Request(pool)
 pool.connect( err => {
@@ -158,11 +168,11 @@ pool.connect( err => {
   }
   subpanelFirmware.query('SELECT HWDESCRP, DESCRP, SPANEL.FIRMWARE_VERSION, SPANEL.INSTALLED FROM SPANEL INNER JOIN Panel on SPANEL.PPID LIKE (PANEL.PPID + \'00\')', (err, result) => {
     logger.write('##Sub-Panel Firmware Versions: \r\n');
-    logger.write('Description:'.padEnd(64) + 'Connected to Controller:'.padEnd(64) + 'Installed:'.padEnd(10) + 'Firmware Version:' + '\r\n')
+    logger.write('Description:'.padEnd(64) + 'Connected to Controller:'.padEnd(64) + 'Installed:'.padEnd(12) + 'Firmware Version:' + '\r\n')
     let all = [...result.recordset];
     all.forEach(line => {
 
-        logger.write(line?.HWDESCRP.padEnd(64) + line?.DESCRP.padEnd(64) + line?.INSTALLED.padEnd(10) + line?.FIRMWARE_VERSION + '\r\n');
+        logger.write(line?.HWDESCRP.padEnd(64) + line?.DESCRP.padEnd(64) + line?.INSTALLED.padEnd(12) + line?.FIRMWARE_VERSION + '\r\n');
 
     })
     logger.write('\r\n\r\n');
@@ -174,6 +184,23 @@ pool.connect( err => {
 })
 }
 
+// Get Software Version/DB_Version
+function checkSWVersion() {
+  const SWVersion = new sql.Request(pool)
+  pool.connect( err => {
+    if (err) {
+      console.log(err);
+    }
+    SWVersion.query('SELECT CONCAT(VER_MAJOR_NUM,\'.\',VER_MINOR_NUM, \' Build \', Build_No) FROM db_version', (err, result) => {
+      logger.write('##ProWatch Version: ' + result.recordset[0][''] +'\r\n\r\n');
+
+      if(err) {
+        console.log(err);
+      }
+    
+    })
+  })
+}
 
 // Helper functions
 
