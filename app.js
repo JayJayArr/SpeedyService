@@ -47,13 +47,15 @@ readline.question('Please enter a username with read rights to the SQL-Server:',
 
     // Run all required functions
     databaseSize();
+    getDiskSpace();
     checkUpdates();
     sqlversion();
     checkSWVersion();
-    
+    checkHiQueue();
     checkPanelFirmware();
     checkSubPanelFirmware();
-  
+    GetAlarms();
+    GetUninstalledDevices();
   })
 })
 
@@ -68,8 +70,6 @@ logger.write('Service Report for ProWatch at ' + Date() + '\n\n')
 // log the OS-info
 logger.write('##OS-Version: ' + os.version() + ' ' + os.release() + '\r\n');
 
-// get DiskSpace
-getDiskSpace();
 
 // check for updates
 function checkUpdates() {
@@ -91,9 +91,7 @@ function checkUpdates() {
 
 // Get the remaining Diskspace
 function getDiskSpace() {
-  checkDiskSpace('C:/').then((diskSpace) => {
-    const unitNumber = 0
-  
+  checkDiskSpace('C:/').then((diskSpace) => {  
     const result = formatBytes(diskSpace.free)
     const percentage = Math.round(diskSpace.free / diskSpace.size * 10000) / 100;
     logger.write( '##Free Disk Space (C:\): ' + result.toString() + '(' +percentage  + '%)\r\n')
@@ -194,6 +192,66 @@ function checkSWVersion() {
     SWVersion.query('SELECT CONCAT(VER_MAJOR_NUM,\'.\',VER_MINOR_NUM, \' Build \', Build_No) FROM db_version', (err, result) => {
       logger.write('##ProWatch Version: ' + result.recordset[0][''] +'\r\n\r\n');
 
+      if(err) {
+        console.log(err);
+      }
+    
+    })
+  })
+}
+
+// Get Size of HI QUEUE Table
+function checkHiQueue() {
+  const HiQueue = new sql.Request(pool)
+  pool.connect( err => {
+    if (err) {
+      console.log(err);
+    }
+    HiQueue.query('SELECT COUNT(*) FROM HI_QUEUE', (err, result) => {
+      logger.write('##Size of HI_QUEUE table(should be smaller than 1k lines): ' + result.recordset[0][''] + ' lines' + '\r\n\r\n');
+
+      if(err) {
+        console.log(err);
+      }
+    
+    })
+  })
+}
+
+// Get Alarms and Logical Devices Installed
+function GetAlarms() {
+  const Alarms = new sql.Request(pool)
+  pool.connect( err => {
+    if (err) {
+      console.log(err);
+    }
+    Alarms.query('SELECT COUNT(LOGDEVDESCRP) AS \'ALARMS\', LOGDEVDESCRP, INSTALLED FROm EV_LOG INNER JOIN AL_PTS ON AL_PTS.ADDR = EV_LOG.EVNT_ADDR INNER JOIN AL_TYP ON AL_PTS.ALTYP = AL_TYP.ID INNER JOIN LOGICAL_DEV_D ON EV_LOG.LOGDEVID = LOGICAL_DEV_D.ID WHERE AL_TYP.ALARM_PROC = \'Y\' AND EVNT_DAT > DATEADD(day, -365, GETDATE()) GROUP BY LOGDEVDESCRP, INSTALLED ORDER BY ALARMS DESC', (err, result) => {
+      logger.write('##Logical Devices with Alarms: \r\n' + 'Alarms:'.padEnd(12) + 'Logical Device:'.padEnd(64) + 'Installed\r\n');
+      result?.recordset.forEach( line => {
+        logger.write(line?.ALARMS.toString().padEnd(12) + line?.LOGDEVDESCRP.padEnd(64) + line?.INSTALLED + '\r\n');
+      })
+      logger.write('\r\n\r\n')
+      if(err) {
+        console.log(err);
+      }
+    
+    })
+  })
+}
+
+// Get uninstalled Logical Devices
+function GetUninstalledDevices() {
+  const UninstalledDevices = new sql.Request(pool)
+  pool.connect( err => {
+    if (err) {
+      console.log(err);
+    }
+    UninstalledDevices.query('SELECT DESCRP, INSTALLED FROM LOGICAL_DEV_D INNER JOIN LOGICAL_DEV ON LOGICAL_DEV.ID = LOGICAL_DEV_D.ID WHERE INSTALLED <> \'Y\'', (err, result) => {
+      logger.write('##Uninstalled Logical Devices: \r\n' + 'Logical Device:'.padEnd(64) + 'Installed\r\n');
+      result?.recordset.forEach( line => {
+        logger.write(line?.LOGDEVDESCRP.padEnd(64) + line?.INSTALLED + '\r\n');
+      })
+      logger.write('\r\n\r\n')
       if(err) {
         console.log(err);
       }
