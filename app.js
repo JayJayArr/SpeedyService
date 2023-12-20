@@ -56,6 +56,8 @@ readline.question('Please enter a username with read rights to the SQL-Server:',
     checkSubPanelFirmware();
     GetAlarms();
     GetUninstalledDevices();
+    GetReaderGrants();
+    GetBusiestDay();
   })
 })
 
@@ -94,7 +96,7 @@ function getDiskSpace() {
   checkDiskSpace('C:/').then((diskSpace) => {  
     const result = formatBytes(diskSpace.free)
     const percentage = Math.round(diskSpace.free / diskSpace.size * 10000) / 100;
-    logger.write( '##Free Disk Space (C:\): ' + result.toString() + '(' +percentage  + '%)\r\n')
+    logger.write( '##Free Disk Space (C:\): ' + result.toString() + '(' +percentage  + '%)\r\n\r\n')
   
   })
 }
@@ -248,14 +250,60 @@ function GetUninstalledDevices() {
     }
     UninstalledDevices.query('SELECT DESCRP, INSTALLED FROM LOGICAL_DEV_D INNER JOIN LOGICAL_DEV ON LOGICAL_DEV.ID = LOGICAL_DEV_D.ID WHERE INSTALLED <> \'Y\'', (err, result) => {
       logger.write('##Uninstalled Logical Devices: \r\n' + 'Logical Device:'.padEnd(64) + 'Installed\r\n');
-      result?.recordset.forEach( line => {
-        logger.write(line?.LOGDEVDESCRP.padEnd(64) + line?.INSTALLED + '\r\n');
-      })
+      if (result?.recordset != []) {
+        result?.recordset.forEach( line => {
+          logger.write(line?.LOGDEVDESCRP.padEnd(64) + line?.INSTALLED + '\r\n');
+        })
+        logger.write('\r\n\r\n')
+        if(err) {
+          console.log(err);
+        }
+      }    
+    })
+  })
+}
+
+// Get Grants by Readers
+function GetReaderGrants() {
+  const ReaderGrants = new sql.Request(pool)
+  pool.connect( err => {
+    if (err) {
+      console.log(err);
+    }
+    ReaderGrants.query('SELECT LOGDEVDESCRP, COUNT(LOGDEVDESCRP) GRANTS FROm EV_LOG WHERE EVNT_DESCRP LIKE \'%Grant%\' GROUP BY LOGDEVDESCRP ORDER BY GRANTS DESC', (err, result) => {
+      logger.write('##Grants by Reader: \r\n' + 'Reader:'.padEnd(64) + 'Grants:\r\n');
+
+        result?.recordset.forEach( line => {
+          logger.write(line?.LOGDEVDESCRP.padEnd(64) + line?.GRANTS + '\r\n');
+        })
+        logger.write('\r\n\r\n')
+        if(err) {
+          console.log(err);
+        }
+      
+    })
+  })
+}
+
+// Get busiest day
+function GetBusiestDay() {
+  const BusiestDay = new sql.Request(pool)
+  pool.connect( err => {
+    if (err) {
+      console.log(err);
+    }
+    BusiestDay.query('SELECT COUNT(CONVERT(DATE, EVNT_DAT)) AS AMOUNT , CONVERT(DATE, EVNT_DAT) AS DATUM FROm EV_LOG WHERE EVNT_DESCRP LIKE \'%Grant%\' GROUP BY CONVERT(DATE, EVNT_DAT) ORDER BY AMOUNT DESC ', (err, result) => {
+      logger.write('##Busiest Day: \r\n' + 'Grants:'.padEnd(15) + 'Date:\r\n');
+      logger.write(result?.recordset[0]?.AMOUNT.toString().padEnd(15) + result?.recordset[0]?.DATUM.toString() + '\r\n');
       logger.write('\r\n\r\n')
-      if(err) {
-        console.log(err);
-      }
-    
+      let length = result.recordset.length;
+      logger.write('##Most quiet day: \r\n' + 'Grants:'.padEnd(15) + 'Date:\r\n');
+      logger.write(result?.recordset[length-1]?.AMOUNT.toString().padEnd(15) + result?.recordset[length-1]?.DATUM.toString() + '\r\n');
+      logger.write('\r\n\r\n')
+        if(err) {
+          console.log(err);
+        }
+      
     })
   })
 }
