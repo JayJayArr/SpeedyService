@@ -8,14 +8,12 @@ const checkDiskSpace = require('check-disk-space').default;
 const readline = require('node:readline').createInterface({
   input: process.stdin,
   output: process.stdout,
-});;
+});
 
 let pool;
 let requiredUpdates = [];
 
 // Asking the user for the Credentials of a elevated user
-process.stdout.write("Please enter the username of a user with read privileges to the SQL Server(e.g. sa):")
-
 readline.question('Please enter a username with read rights to the SQL-Server:', username => {
   let elevatedUsername = username;
   let elevatedPassword;
@@ -52,12 +50,12 @@ readline.question('Please enter a username with read rights to the SQL-Server:',
     sqlversion();
     checkSWVersion();
     checkHiQueue();
-    checkPanelFirmware();
-    checkSubPanelFirmware();
     GetAlarms();
     GetUninstalledDevices();
     GetReaderGrants();
     GetBusiestDay();
+    checkPanelFirmware();
+    checkSubPanelFirmware();
   })
 })
 
@@ -271,7 +269,7 @@ function GetReaderGrants() {
       console.log(err);
     }
     ReaderGrants.query('SELECT LOGDEVDESCRP, COUNT(LOGDEVDESCRP) GRANTS FROm EV_LOG WHERE EVNT_DESCRP LIKE \'%Grant%\' GROUP BY LOGDEVDESCRP ORDER BY GRANTS DESC', (err, result) => {
-      logger.write('##Grants by Reader: \r\n' + 'Reader:'.padEnd(64) + 'Grants:\r\n');
+      logger.write('##Access Granted Events grouped by Reader: \r\n' + 'Reader:'.padEnd(64) + 'Grants:\r\n');
 
         result?.recordset.forEach( line => {
           logger.write(line?.LOGDEVDESCRP.padEnd(64) + line?.GRANTS + '\r\n');
