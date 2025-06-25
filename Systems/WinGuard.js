@@ -10,7 +10,7 @@ console.log("Datapoints saved: ", datapoints.objects.length);
 console.log("Datapoints in unknown State: ", datapoints.objects.filter(datapoint => datapoint.effectiveState.flags == 4096).length)
 
 console.log("\n[EXTENSIONS]");
-console.log("Extensions and the main connected Servers: ", interfaces.objects.length);
+console.log("Extensions and their main connected Servers: ", interfaces.objects.length);
 interfaces.objects.forEach((interface)=> {
     console.log(interface.code, 
         interface.name, 
